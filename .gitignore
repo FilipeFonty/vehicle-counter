@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# pyenv
+.python-version
+
+# Modelos e pesos (baixados automaticamente, não versionar)
+*.pt
+*.onnx
+models/
+
+# Dados e saidas
+data/*.mp4
+data/*.avi
+data/*.mov
+outputs/
+
+# Manter as pastas no repositorio
+!data/.gitkeep
+!outputs/.gitkeep
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
