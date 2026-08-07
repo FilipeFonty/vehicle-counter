@@ -1,0 +1,12 @@
+# Dependencias de desenvolvimento: exportacao do modelo, testes e
+# comparacao com a implementacao de referencia. Nao vao para a imagem.
+-r requirements.txt
+
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+ultralytics
+onnx
+onnxslim
+opencv-python
+pytest
