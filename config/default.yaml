@@ -1,0 +1,51 @@
+model:
+  # Caminho relativo a raiz do projeto.
+  path: models/yolo26n_e2e.onnx
+  # auto | yolo26 | yolo11 -- 'auto' deduz pelo shape da saida.
+  format: auto
+  input_size: 640
+  confidence_threshold: 0.25
+  iou_threshold: 0.45
+  # Classes COCO: 2=car, 3=motorcycle, 5=bus, 7=truck
+  allowed_classes: [2, 3, 5, 7]
+  # Limita threads do ONNX Runtime. Em dev (28 threads) medir sem limite
+  # produz FPS irreal frente ao Raspberry Pi 5 (4 nucleos).
+  intra_op_num_threads: 4
+
+filtering:
+  # NMS class-agnostic de limpeza. Necessario mesmo no YOLO26:
+  # a saida contem caixas identicas com classes diferentes.
+  apply_nms: true
+  nms_class_agnostic: true
+  # Area minima da caixa em pixels da imagem ORIGINAL.
+  # Descarta veiculos distantes demais para rastrear de forma estavel.
+  min_box_area: 900
+  # Poligono da regiao de interesse, em pixels da imagem original.
+  # null desativa o filtro.
+  roi_polygon: null
+  # Exemplo para 1920x1080:
+  # roi_polygon:
+  #   - [0, 400]
+  #   - [1920, 400]
+  #   - [1920, 1080]
+  #   - [0, 1080]
+
+tracking:
+  tracker: bytetrack
+  track_buffer: 60
+  track_high_thresh: 0.40
+  track_low_thresh: 0.10
+  new_track_thresh: 0.55
+  match_thresh: 0.85
+
+counting:
+  line_start: [100, 700]
+  line_end: [1820, 700]
+  hysteresis_pixels: 15
+  # Frames sem atualizacao antes de descartar o estado do track.
+  track_expiry_frames: 90
+
+application:
+  save_annotated_images: true
+  output_directory: outputs
+  camera_id: gate-01
