@@ -10,8 +10,8 @@ venv/
 
 # Modelos e pesos (baixados automaticamente, não versionar)
 *.pt
-*.onnx
-models/
+/models/*.onnx
+/models/
 
 # Dados e saidas
 data/*.mp4
