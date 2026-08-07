@@ -19,7 +19,7 @@ filtering:
   nms_class_agnostic: true
   # Area minima da caixa em pixels da imagem ORIGINAL.
   # Descarta veiculos distantes demais para rastrear de forma estavel.
-  min_box_area: 900
+  min_box_area: 8000
   # Poligono da regiao de interesse, em pixels da imagem original.
   # null desativa o filtro.
   roi_polygon: null
@@ -33,14 +33,14 @@ filtering:
 tracking:
   tracker: bytetrack
   track_buffer: 60
-  track_high_thresh: 0.40
+  track_high_thresh: 0.30
   track_low_thresh: 0.10
-  new_track_thresh: 0.55
+  new_track_thresh: 0.35
   match_thresh: 0.85
 
 counting:
-  line_start: [100, 700]
-  line_end: [1820, 700]
+  line_start: [30, 430]
+  line_end: [1250, 430]
   hysteresis_pixels: 15
   # Frames sem atualizacao antes de descartar o estado do track.
   track_expiry_frames: 90

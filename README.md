@@ -79,7 +79,8 @@ vehicle-counter/
 │   ├── api/
 │   │   ├── routes/
 │   │   │   ├── inference.py      Endpoints JSON e PNG
-│   │   │   └── counts.py         Contagens, eventos, performance
+│   │   │   ├── counts.py         Contagens, eventos, performance
+│   │   │   └── videos.py         Análise de vídeo
 │   │   └── dependencies.py       Instâncias compartilhadas
 │   ├── core/
 │   │   ├── detector.py           Pipeline de inferência explícito
@@ -182,6 +183,8 @@ Documentação interativa em `http://localhost:8000/docs`.
 | GET | `/api/v1/counts` | Contagens por categoria e sentido |
 | GET | `/api/v1/events` | Eventos de cruzamento |
 | GET | `/api/v1/performance` | Latências e FPS |
+| POST | `/api/v1/videos/analyze` | Processa vídeo: detecta, rastreia e conta |
+| GET | `/api/v1/videos/available` | Lista vídeos disponíveis em `data/` |
 | POST | `/api/v1/counts/reset` | Zera contagens |
 | GET | `/health` | Health check |
 | GET | `/docs` | Swagger/OpenAPI |
@@ -226,6 +229,17 @@ curl -X POST http://localhost:8000/api/v1/inference/annotated \
   -F "file=@data/frame_teste.jpg" \
   -o outputs/anotada.png
 ```
+
+Análise de vídeo:
+
+```bash
+curl http://localhost:8000/api/v1/videos/available
+
+curl -X POST "http://localhost:8000/api/v1/videos/analyze?filename=test.mp4&max_frames=505"
+```
+
+Parâmetros: `filename` (arquivo em `data/`), `max_frames`, `stride`,
+`save_annotated`, `reset_counts`.
 
 Contagens e eventos:
 
@@ -309,39 +323,118 @@ Os resultados abaixo são separados em três níveis de evidência.
 ### 1. MEDIDO — ambiente de desenvolvimento (AMD64)
 
 **Hardware:** Intel Core i7-14700HX · 14 GiB RAM · Ubuntu 26.04
-**Modelo:** YOLO26n ONNX, entrada 640×640 · **Imagem:** 1920×1080
+**Modelo:** YOLO26n ONNX, entrada 640×640
+**Vídeo de teste:** 1280×720 @ 25 FPS, 1195 frames (47,8 s), câmera fixa,
+tráfego em dois sentidos
 
-Latência da inferência isolada por número de threads do ONNX Runtime
-(100 execuções, 10 de warmup):
+#### Escalabilidade por número de threads
+
+Inferência isolada, 100 execuções com 10 de warmup:
 
 | Threads | Média | p50 | p95 | Desvio | FPS | Speedup | Eficiência |
 |---|---|---|---|---|---|---|---|
-| 1 | 62,73 ms | 62,47 | 63,63 | 0,52 | 15,94 | 1,00× | 100% |
-| 2 | 33,56 ms | 33,49 | 33,92 | 0,18 | 29,80 | 1,87× | 93% |
-| 4 | 18,95 ms | 18,91 | 19,21 | 0,12 | 52,76 | 3,31× | 83% |
-| 8 | 12,41 ms | 12,30 | 12,90 | 0,36 | 80,60 | 5,05× | 63% |
+| 1 | 63,87 ms | 63,61 | 65,31 | 0,90 | 15,66 | 1,00× | 100% |
+| 2 | 33,89 ms | 33,85 | 34,45 | 0,29 | 29,51 | 1,88× | 94% |
+| 4 | 19,04 ms | 19,01 | 19,21 | 0,12 | 52,52 | 3,35× | 84% |
+| 8 | 12,71 ms | 12,39 | 13,99 | 0,67 | 78,71 | 5,02× | 63% |
 
-Pipeline completo (4 threads):
+O modelo paraleliza bem até 4 núcleos, com 84% de eficiência. O desvio
+padrão muito baixo indica latência previsível, característica desejável em
+operação contínua.
+
+#### Pipeline completo
+
+Processamento dos 1192 frames com gravação do vídeo anotado:
+
+- Latência do detector: média 22,67 ms · p50 22,57 ms · p95 23,17 ms
+- Detector isolado: **44,1 FPS**
+- Pipeline completo com gravação: **34,9 FPS**
+
+Requisição isolada via API sobre um frame:
+
+| Etapa | Tempo |
+|---|---|
+| Pré-processamento | 2,86 ms |
+| Inferência | 22,98 ms |
+| Pós-processamento | 0,32 ms |
+| **Total** | **26,16 ms** |
+
+#### Efeito da resolução de captura
+
+O mesmo conteúdo foi processado em três resoluções ao longo do
+desenvolvimento:
+
+| Resolução | FPS do pipeline | Latência do detector |
+|---|---|---|
+| 3840×2160 | 14,5 | 22,7 ms |
+| 1920×1080 | 28,0 | 21,97 ms |
+| 1280×720 | **34,9** | 22,67 ms |
+
+**A latência da inferência é praticamente constante**, porque o letterbox
+reduz qualquer entrada para 640×640 antes do modelo. Todo o ganho vem de
+decodificação, redimensionamento e encoding mais baratos.
+
+Consequência prática: reduzir a resolução de captura de 4K para 720p mais
+que dobra o throughput sem afetar a precisão do detector. É a otimização de
+melhor custo-benefício para hardware embarcado.
+
+#### Overhead de containerização
 
 | Contexto | Pré | Inferência | Pós | Total |
 |---|---|---|---|---|
 | Nativo | 6,10 ms | 24,40 ms | 2,40 ms | 32,90 ms |
 | Container | 3,33 ms | 24,40 ms | 0,44 ms | 28,17 ms |
 
-A inferência é idêntica nos dois contextos: o Docker isola namespaces, não
-virtualiza processamento. O overhead de containerização em CPU é
-essencialmente nulo.
+A inferência é idêntica: o Docker isola namespaces, não virtualiza
+processamento. O overhead de containerização em CPU é essencialmente nulo.
 
-Processamento de vídeo (300 frames, 1920×1080 @ 30 FPS):
+#### Comparação entre tamanhos de modelo
 
-- Latência do detector: média 23,47 ms · p50 22,89 ms · p95 26,47 ms
-- Detector isolado: **42,6 FPS**
-- Pipeline com gravação do vídeo anotado: **27,7 FPS**
+Ambos avaliados no mesmo vídeo e hardware, com 4 threads:
 
-Memória:
+| | YOLO26n | YOLO26s |
+|---|---|---|
+| Eventos contados | 7 | 9 |
+| Confiança típica | 0,85–0,92 | 0,90–0,96 |
+| Latência média | 22,7 ms | 61,6 ms |
+| FPS do detector | 44,0 | 16,2 |
+
+O YOLO26s detecta mais e com maior confiança, mas quase triplica a latência.
+Como referência, o YOLO26n com **uma única thread** leva 63,9 ms — valor
+próximo ao que o YOLO26s consome com quatro. Em um dispositivo de quatro
+núcleos e frequência substancialmente menor, o modelo `s` dificilmente
+sustentaria taxa útil.
+
+**Decisão: YOLO26n**, priorizando viabilidade embarcada, que é o objetivo do
+projeto. O `s` permanece exportável para cenários com mais folga
+computacional.
+
+#### Memória
 
 - Container em repouso: **153,7 MB**
 - Pico RSS durante inferência: **210,6 MB**
+
+O footprint cabe folgadamente até em uma Raspberry Pi 5 de 2 GB.
+
+#### Contagem obtida
+
+Vídeo de teste completo, 1192 frames processados, **36 eventos** registrados:
+
+| Sentido | car | motorcycle | bus | truck | Total |
+|---|---|---|---|---|---|
+| Entrada | 2 | 0 | 0 | 0 | 2 |
+| Saída | 30 | 0 | 3 | 1 | 34 |
+
+A assimetria entre sentidos reflete o tráfego real do trecho, não uma falha
+da regra de contagem. Uma análise independente das trajetórias dos tracks
+confirmou 34 veículos deslocando-se em um sentido contra 6 no oposto,
+proporção coerente com a contagem obtida.
+
+**Convenção de sentido.** A direção é determinada pelo sinal do produto
+vetorial em relação ao segmento `line_start → line_end`. Inverter a ordem
+dos pontos na configuração inverte a convenção de entrada e saída,
+permitindo adequar a nomenclatura ao posicionamento físico da câmera sem
+alterar código.
 
 ### 2. VALIDADO FUNCIONALMENTE — ARM64 sob emulação QEMU
 
@@ -479,6 +572,18 @@ captura = cv2.VideoCapture(0)          # câmera USB
 Para o módulo CSI em Raspberry Pi OS recente, a biblioteca `picamera2` é a
 via recomendada, e exigiria um adaptador de captura adicional.
 
+### Evolução prevista: exportação NCNN
+
+A documentação da Ultralytics indica o NCNN como o formato de melhor
+desempenho de inferência em Raspberry Pi, por ser otimizado especificamente
+para arquitetura ARM. A migração exigiria substituir o backend de inferência
+(ONNX Runtime → NCNN SDK) e revalidar todo o pipeline de pré e
+pós-processamento.
+
+Não foi implementada nesta entrega por dois motivos: está fora da stack
+especificada para o projeto, e o ganho não poderia ser medido sem hardware
+ARM físico — a emulação QEMU não produz números de desempenho utilizáveis.
+
 ### Evolução opcional: AI HAT+ com NPU Hailo
 
 O AI HAT+ adiciona um acelerador Hailo que descarregaria a inferência da CPU.
@@ -556,35 +661,73 @@ e caminhões — situação já observada pontualmente durante o desenvolvimento
 
 ## Limitações conhecidas
 
-Documentadas por transparência:
+Documentadas por transparência.
 
-1. **Vídeo de teste de sentido único.** O material utilizado contém tráfego
-   em apenas um sentido, resultando em contagem de saída zerada na
-   demonstração. A lógica de direção é validada por testes unitários
-   (`test_direcoes_opostas_sao_distinguidas`), mas não há evidência visual.
+### 1. Motocicletas não são contadas
 
-2. **Classes `motorcycle` e `truck` sem evidência visual robusta.** O vídeo
-   contém predominantemente carros e um ônibus. As quatro classes estão
-   implementadas e testadas unitariamente, mas a demonstração não as exercita.
+Nenhum dos vídeos de teste avaliados forneceu motocicletas em quantidade
+suficiente para validar a classe. No material final, o detector registra
+apenas 3 detecções de motocicleta ao longo de 1195 frames.
 
-3. **Linha de contagem não calibrada para o cenário-alvo.** Os valores em
-   `config/default.yaml` foram definidos para o vídeo de teste, não para uma
-   portaria industrial real.
+Uma investigação conduzida em um vídeo anterior é ilustrativa: varrendo os
+frames com limiar de confiança reduzido a 0,15, o detector localizava
+motocicletas 17 vezes, com confiança entre 0,17 e 0,50. A confiança máxima
+observada ficava abaixo do `new_track_thresh`, impedindo a criação de um
+track — e sem track não há ID nem contagem. Reduzir os limiares
+(`new_track_thresh` 0,35 · `min_box_area` 12.000 · `track_high_thresh` 0,30)
+foi testado e não resolveu, apenas degradou a estabilidade das demais
+classes.
 
-4. **Sem validação em Raspberry Pi 5 física.** Ver seção de desempenho.
+A causa provável é que o modelo pré-treinado no COCO tem dificuldade com
+motocicletas em ângulo elevado, perspectiva sub-representada no conjunto de
+treino. Este é exatamente o cenário que justifica o fine-tuning previsto
+como evolução: um conjunto anotado do cenário-alvo permitiria ao modelo
+aprender a aparência de motocicletas vistas de cima.
 
-5. **Persistência apenas em memória.** Eventos são perdidos ao reiniciar a
-   aplicação. Persistência em SQLite ou JSON é uma evolução prevista.
+A classe está implementada, normalizada e coberta por testes unitários; o
+que falta é evidência visual em vídeo.
 
-6. **Processamento de vídeo síncrono.** Adequado para o escopo atual;
-   vídeos longos bloqueariam a requisição HTTP.
+### 2. Tráfego assimétrico no vídeo de teste
 
-7. **Métricas de detecção não avaliadas quantitativamente.** Precision,
-   recall, F1, mAP50 e mAP50-95 exigiriam um conjunto anotado do cenário-alvo,
-   inexistente neste escopo. As métricas de contagem, latência e memória foram
-   medidas.
+O material apresenta 34 veículos em um sentido contra 6 no oposto, o que
+produz uma contagem de entrada pouco representativa (2 eventos). A lógica de
+direção está validada por teste unitário
+(`test_direcoes_opostas_sao_distinguidas`) e os 2 eventos de entrada
+comprovam que o sentido oposto é detectado, mas um vídeo com fluxo
+equilibrado produziria uma demonstração mais convincente.
 
----
+### 3. Dashboard não implementado
+
+Previsto no enunciado como evolução futura. As métricas estão disponíveis
+via `/api/v1/counts`, `/api/v1/events` e `/api/v1/performance`, e podem ser
+consultadas pela interface Swagger em `/docs`.
+
+### 4. Sem validação em Raspberry Pi 5 física
+
+Ver a seção de desempenho. Nenhuma métrica foi medida em hardware ARM real.
+
+### 5. Métricas de detecção não avaliadas quantitativamente
+
+Precision, recall, F1, mAP50 e mAP50-95 exigiriam um conjunto anotado do
+cenário-alvo, inexistente neste escopo. As métricas de contagem, latência e
+memória foram medidas.
+
+### 6. Persistência apenas em memória
+
+Eventos são perdidos ao reiniciar a aplicação. Persistência em SQLite ou
+JSON é uma evolução prevista.
+
+### 7. Processamento de vídeo síncrono
+
+Adequado ao escopo atual. Vídeos longos mantêm a conexão HTTP aberta durante
+todo o processamento; `max_frames` e `stride` limitam a duração.
+
+### 8. Calibração dependente de resolução
+
+As coordenadas da linha estão em pixels absolutos, exigindo recalibração ao
+trocar a resolução da fonte. Converter para coordenadas normalizadas
+(0,0 a 1,0) tornaria a configuração independente de resolução — evolução
+prevista de baixo custo.
 
 ## Testes
 

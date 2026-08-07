@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from app.api.dependencies import get_detector
-from app.api.routes import counts, inference
+from app.api.routes import counts, inference, videos
 from app.config import get_settings
 from app.models.responses import HealthResponse
 
@@ -21,6 +21,7 @@ app = FastAPI(
 
 app.include_router(inference.router)
 app.include_router(counts.router)
+app.include_router(videos.router)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])
