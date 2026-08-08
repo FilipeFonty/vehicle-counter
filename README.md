@@ -235,7 +235,7 @@ Análise de vídeo:
 ```bash
 curl http://localhost:8000/api/v1/videos/available
 
-curl -X POST "http://localhost:8000/api/v1/videos/analyze?filename=test.mp4&max_frames=505"
+curl -X POST "http://localhost:8000/api/v1/videos/analyze?filename=test.mp4&max_frames=1192"
 ```
 
 Parâmetros: `filename` (arquivo em `data/`), `max_frames`, `stride`,
