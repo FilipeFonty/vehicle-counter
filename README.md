@@ -438,6 +438,7 @@ alterar código.
 
 ### 2. VALIDADO FUNCIONALMENTE — ARM64 sob emulação QEMU
 
+- QEMU - Software livre de código aberto que atua como emulador de hardware e hipervisor
 - Arquitetura confirmada em execução: `aarch64`
 - `onnxruntime` 1.28.0 e `opencv-python-headless` 5.0.0 importam sem
   compilação da fonte (wheels ARM64 disponíveis)
@@ -602,6 +603,8 @@ priorizado pelo alvo embarcado. YOLO11n permanece suportado no código como
 alternativa, com decodificação de tensor bruto e NMS manual.
 
 ### NMS mesmo com arquitetura NMS-free
+
+- Non-Maximum Suppression (NMS) — ou Supressão de Não-Máximos — é uma técnica de pós-processamento usada em visão computacional e detecção de objetos. O seu objetivo é eliminar caixas delimitadoras (bounding boxes) duplicadas ou redundantes em cima de um único objeto, mantendo apenas a melhor e mais precisa previsão.
 
 A arquitetura do YOLO26 elimina o NMS do grafo do modelo, mas a saída ainda
 contém caixas sobrepostas. Foi observado, em imagem real, o mesmo objeto
