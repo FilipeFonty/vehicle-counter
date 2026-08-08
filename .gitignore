@@ -14,7 +14,7 @@ venv/
 /models/
 
 # Dados e saidas
-data/*.mp4
+# data/*.mp4
 data/*.avi
 data/*.mov
 outputs/
