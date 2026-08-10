@@ -7,6 +7,18 @@ cruzamento de linha virtual e API HTTP com FastAPI.
 Projetado para execução local (sem inferência em nuvem) e para viabilidade
 em hardware embarcado ARM64, com foco na Raspberry Pi 5.
 
+**Modelo:** YOLO26n (COCO), escolhido pela arquitetura NMS-free voltada a
+dispositivos de borda. A comparação medida com o YOLO26s — 22,7 ms contra
+61,6 ms de latência — está documentada em [Desempenho](#desempenho).
+
+## Demonstração
+
+Vídeo de demonstração (5 min): [link]
+
+Mostra o container em execução, requisições reais aos dois endpoints
+obrigatórios (JSON e PNG anotado), o vídeo anotado com rastreamento e
+contagem, e a imagem ARM64 executando via QEMU.
+
 ---
 
 ## Sumário
