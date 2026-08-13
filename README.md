@@ -13,7 +13,7 @@ dispositivos de borda. A comparação medida com o YOLO26s — 22,7 ms contra
 
 ## Demonstração
 
-Vídeo de demonstração (5 min): [link]
+[Vídeo de demonstração (5 min)](https://youtu.be/cxSyl4rxWD0)
 
 Mostra o container em execução, requisições reais aos dois endpoints
 obrigatórios (JSON e PNG anotado), o vídeo anotado com rastreamento e
