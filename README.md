@@ -11,6 +11,8 @@ em hardware embarcado ARM64, com foco na Raspberry Pi 5.
 dispositivos de borda. A comparação medida com o YOLO26s — 22,7 ms contra
 61,6 ms de latência — está documentada em [Desempenho](#desempenho).
 
+Stack: Python 3.11 · YOLO26n · ONNX Runtime · ByteTrack · FastAPI · Docker
+
 ## Demonstração
 
 [Vídeo de demonstração (6 min)](https://youtu.be/cxSyl4rxWD0)
